@@ -4,7 +4,7 @@ rm(list=ls(all=TRUE))
 
 library(RCurl)
 
-data=read.table(text = getURL("https://raw.githubusercontent.com/rajsiddarth/Adaboost/master/dataset.csv"), header=T, sep=',',
+data=read.table(text = getURL("https://raw.githubusercontent.com/rajsiddarth/xgboost_gradientboost/master/Dataset.csv"), header=T, sep=',',
                 col.names = c('ID', 'age', 'exp', 'inc', 
                               'zip', 'family', 'ccavg', 'edu', 
                               'mortgage', 'loan', 'securities', 
