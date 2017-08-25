@@ -1,43 +1,36 @@
+#Implementation of gradient boosting in h20 
+
 rm(list=ls(all=TRUE))
 
-setwd("C:/Users/jeevan/Desktop/Lab")
+library(RCurl)
 
-attr = c('id', 'age', 'exp', 'inc', 'zip', 'family', 
-         'ccavg', 'edu', 'mortgage', 'loan', 
-         'securities', 'cd', 'online', 'cc')
+data=read.table(text = getURL("https://raw.githubusercontent.com/rajsiddarth/Adaboost/master/dataset.csv"), header=T, sep=',',
+                col.names = c('ID', 'age', 'exp', 'inc', 
+                              'zip', 'family', 'ccavg', 'edu', 
+                              'mortgage', 'loan', 'securities', 
+                              'cd', 'online', 'cc'))
+#Removing the id, zip and experience
 
-# Read the data using csv file
-data = read.csv(file = "UniversalBank.csv", 
-                header = TRUE, col.names = attr)
+data=subset(data,select = -c(ID,zip,exp))
 
-# Removing the id, zip and experience. 
-drop_Attr = c("id", "zip", "exp")
-attr = setdiff(attr, drop_Attr)
-data = data[, attr]
-rm(drop_Attr)
+#Numeric attributes : age,inc,family,CCAvg,Mortgage
+#Categorical: Education,Securities account,CD Account,Online,Credit card
+#Target Variable: Personal Loan
+num_data=data.frame(sapply(data[c('age','inc','family','ccavg')],function(x){as.numeric(x)}))
+categ_attributes=c('edu','securities','cd','online')
+categ_data=data.frame(sapply(data[categ_attributes],function(x){as.factor(x)}))
+loan=as.factor(data$loan)
 
-# Convert attribute to appropriate type  
-cat_Attr = c("family", "edu", "securities", 
-             "cd", "online", "cc", "loan")
-num_Attr = setdiff(attr, cat_Attr)
-rm(attr)
+#Final data
+data=cbind(num_data,categ_data,loan)
+str(data)
 
-cat_Data <- data.frame(sapply(data[,cat_Attr], as.factor))
-num_Data <- data.frame(sapply(data[,num_Attr], as.numeric))
-
-data = cbind(num_Data, cat_Data)
-rm(cat_Data, num_Data, cat_Attr, num_Attr)
-
-# Do the summary statistics and check for missing values and outliers.
-summary(data)
-
-# Divide the data in to test and train
-set.seed(123)
-train_rowIDs = sample(1:nrow(data), nrow(data)*.8)
-train = data[train_rowIDs,] 
-test = data[-train_rowIDs,] 
-
-rm(data, train_rowIDs)
+#Dividing into train and test
+library(caTools)
+index=sample.split(data$loan,SplitRatio = 0.7)
+train=data[index,]
+test=data[!index,]
+ind_variables=setdiff(names(data),"loan")
 
 # Load H2o library
 library(h2o)
@@ -46,35 +39,27 @@ library(h2o)
 h2o.init(nthreads = -1, max_mem_size = "2g")
 
 # Import a local R train data frame to the H2O cloud
-train.hex <- as.h2o(x = train, destination_frame = "train.hex")
-
+train_data= as.h2o(x = train, destination_frame = "train_data")
 
 # Prepare the parameters for the for H2O gbm grid search
-ntrees_opt <- c(5, 10, 15, 20, 30)
-maxdepth_opt <- c(2, 3, 4, 5)
-learnrate_opt <- c(0.01, 0.05, 0.1, 0.15 ,0.2, 0.25)
-hyper_parameters <- list(ntrees = ntrees_opt, 
-                         max_depth = maxdepth_opt, 
-                         learn_rate = learnrate_opt)
+ntrees= c(5, 10, 15, 20, 25, 30)
+maxdepth=c(2, 3, 4)
+learnrate=c(0.01, 0.05, 0.1, 0.15 ,0.2, 0.25)
+hyper_parameters=list(ntrees = ntrees,max_depth = maxdepth,learn_rate = learnrate)
 
 # Build H2O GBM with grid search
-grid_GBM <- h2o.grid(algorithm = "gbm", grid_id = "grid_GBM.hex",
-                     hyper_params = hyper_parameters, 
-                     y = "loan", x = setdiff(names(train.hex), "loan"),
-                     training_frame = train.hex)
+grid_GBM= h2o.grid(algorithm = "gbm", grid_id = "grid_GBM_data",hyper_params = hyper_parameters, 
+                     y = "loan", x = setdiff(names(train_data), "loan"),
+                     training_frame = train_data)
 
-# Remove unused R objects
-rm(ntrees_opt, maxdepth_opt, learnrate_opt, hyper_parameters)
-
-# Get grid summary
 summary(grid_GBM)
 
 # Fetch GBM grid models
-grid_GBM_models <- lapply(grid_GBM@model_ids, 
+grid_GBM_models=lapply(grid_GBM@model_ids, 
                           function(model_id) { h2o.getModel(model_id) })
 
 # Function to find the best model with respective to AUC
-find_Best_Model <- function(grid_models){
+find_Best_Model=function(grid_models){
   best_model = grid_models[[1]]
   best_model_AUC = h2o.auc(best_model)
   for (i in 2:length(grid_models)) 
@@ -93,8 +78,6 @@ find_Best_Model <- function(grid_models){
 # Find the best model by calling find_Best_Model Function
 best_GBM_model = find_Best_Model(grid_GBM_models)
 
-rm(grid_GBM_models)
-
 # Get the auc of the best GBM model
 best_GBM_model_AUC = h2o.auc(best_GBM_model)
 
@@ -105,17 +88,16 @@ best_GBM_model
 best_GBM_model@parameters
 
 # Important Variables.
-varImp_GBM <- h2o.varimp(best_GBM_model)
+varImp_GBM = h2o.varimp(best_GBM_model)
 
 # Import a local R test data frame to the H2O cloud
-test.hex <- as.h2o(x = test, destination_frame = "test.hex")
-
+test_data=as.h2o(x = test, destination_frame = "test_data")
 
 # Predict on same training data set
-predict.hex = h2o.predict(best_GBM_model, 
-                          newdata = test.hex[,setdiff(names(test.hex), "loan")])
+predict= h2o.predict(best_GBM_model, 
+                          newdata = test_data[,setdiff(names(test_data), "loan")])
        
-data_GBM = h2o.cbind(test.hex[,"loan"], predict.hex)
+data_GBM = h2o.cbind(test_data[,"loan"], predict)
                     
 # Copy predictions from H2O to R
 pred_GBM = as.data.frame(data_GBM)
@@ -127,3 +109,4 @@ h2o.shutdown(F)
 conf_Matrix_GBM = table(pred_GBM$loan, pred_GBM$predict) 
 
 Accuracy = (conf_Matrix_GBM[1,1]+conf_Matrix_GBM[2,2])/sum(conf_Matrix_GBM)
+cat("accuracy on test data= ",round(Accuracy,3)*100)
