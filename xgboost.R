@@ -1,94 +1,54 @@
-# # Installation. 
-# # Note: Windows user will need to install Rtools first
-# install.packages("drat", repos="https://cran.rstudio.com")
-# drat:::addRepo("dmlc")
-# install.packages("xgboost", repos="http://dmlc.ml/drat/", type = "source")
-
+#Implementation of xgboost in R
 rm(list=ls(all=TRUE))
+library(RCurl)
 
-setwd("C:/Users/jeevan/Desktop/Lab")
+data=read.table(text = getURL("https://raw.githubusercontent.com/rajsiddarth/xgboost_gradientboost/master/Dataset.csv"), header=T, sep=',',
+                col.names = c('ID', 'age', 'exp', 'inc', 
+                              'zip', 'family', 'ccavg', 'edu', 
+                              'mortgage', 'loan', 'securities', 
+                              'cd', 'online', 'cc'))
+#Removing the id, zip and experience
 
-# Load required libraries
+data=subset(data,select = -c(ID,zip,exp))
+
+#Numeric attributes : age,inc,family,CCAvg,Mortgage
+#Categorical: Education,Securities account,CD Account,Online,Credit card
+#Target Variable: Personal Loan
+num_data=data.frame(sapply(data[c('age','inc','family','ccavg')],function(x){as.numeric(x)}))
+categ_attributes=c('edu','securities','cd','online')
+categ_data=data.frame(sapply(data[categ_attributes],function(x){as.factor(x)}))
+loan=as.factor(data$loan)
+data=cbind(num_data,categ_data,loan)
+str(data)
+
+# Standardizing the numeric data
 library(vegan)
+final_Data1 = decostand(data[,names(num_data)], "range") 
+
+# Convert all categorical attributes to numeric using dummies
 library(dummies)
-library(xgboost) 
-
-attr = c('id', 'age', 'exp', 'inc', 'zip', 'family', 
-         'ccavg', 'edu', 'mortgage', 'loan', 
-         'securities', 'cd', 'online', 'cc')
-
-# Read the data using csv file
-data = read.csv(file = "UniversalBank.csv", 
-                header = TRUE, col.names = attr)
-
-# Removing the id, zip and experience. 
-drop_Attr = c("id", "zip", "exp")
-attr = setdiff(attr, drop_Attr)
-data = data[, attr]
-rm(drop_Attr)
-
-# Convert attribute to appropriate type  
-cat_Attr = c("family", "edu", "securities", 
-             "cd", "online", "cc", "loan")
-num_Attr = setdiff(attr, cat_Attr)
-rm(attr)
-
-cat_Data <- data.frame(sapply(data[,cat_Attr], as.factor))
-num_Data <- data.frame(sapply(data[,num_Attr], as.numeric))
-
-data = cbind(num_Data, cat_Data)
-rm(cat_Data, num_Data)
-
-# Do the summary statistics and check for missing values and outliers.
-summary(data)
-#------------------------------------------------------
+final_Data2=dummy.data.frame(data[categ_attributes])
+final_data=cbind(final_Data1,final_Data2,loan)
+str(final_data)
 
 # Build the xgboost classification model.
 
-# Standardizing the numeric data
-final_Data = decostand(data[,num_Attr], "range") 
-rm(num_Attr)
-
-# Convert all categorical attributes to numeric 
-# 1. Using dummy function, convert education and family categorical attributes into numeric attributes 
-edu = dummy(data$edu)
-family = dummy(data$family)
-final_Data = cbind(final_Data, edu, family)
-cat_Attr = setdiff(cat_Attr, c("edu", "family"))
-rm(edu, family)
-
-# 2. Using as.numeric function, convert remaining categorical attributes into numeric attributes 
-final_Data = cbind(final_Data, sapply(data[,cat_Attr], 
-                                      function(x){as.numeric(as.character(x))}))
-rm(cat_Attr)
-
-ind_Attr = setdiff(names(final_Data), "loan")
-
-str(final_Data)
-summary(final_Data)
+ind_Attr = setdiff(names(final_data), "loan")
 
 # Divide the data into test, train and eval
 set.seed(123)
-
-rowIDs = 1:nrow(final_Data)
+rowIDs = 1:nrow(final_data)
 train_RowIDs =  sample(rowIDs, length(rowIDs)*0.6)
 test_RowIDs = sample(setdiff(rowIDs, train_RowIDs), length(rowIDs)*0.2)
 eval_RowIDs = setdiff(rowIDs, c(train_RowIDs, test_RowIDs))
-rm(rowIDs)
 
-train_Data = final_Data[train_RowIDs,]
-test_Data = final_Data[test_RowIDs,]
-eval_Data = final_Data[eval_RowIDs,]
-rm(train_RowIDs, test_RowIDs, eval_RowIDs)
+train_Data = final_data[train_RowIDs,]
+test_Data = final_data[test_RowIDs,]
+eval_Data = final_data[eval_RowIDs,]
 
-# Check how records are split with respect to target attribute.
-table(final_Data$loan)
-table(train_Data$loan)
-table(test_Data$loan)
-table(eval_Data$loan)
-rm(final_Data)
+#install.packages("xgboost")
+library(xgboost)
 
-# fit the model
 dtrain = xgb.DMatrix(data = as.matrix(train_Data[,ind_Attr]),
                      label = train_Data$loan)
 model = xgboost(data = dtrain, max.depth = 2, 
