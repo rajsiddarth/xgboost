@@ -1,5 +1,5 @@
 # xgboost
-Implementation of Gradient boosting in R and h20:
+Implementation of Gradient boosting and xgboost in R and h2o:
 
 Variable Description for Dataset:
 
