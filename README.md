@@ -1,32 +1,33 @@
 # Gradient Boosting in R using h20 and xgboost library
 The data set considered has the following variables.
-ID: Customer ID
 
-Age: Customer Age
+- ID: Customer ID
 
-Experience: #years of Professional experience
+- Age: Customer Age
 
-Income: Annual Income of the customer in $000
+- Experience: #years of Professional experience
 
-ZIP Code:Home address Zip Code
+- Income: Annual Income of the customer in $000
 
-Family: Family size of the customer
+- ZIP Code:Home address Zip Code
 
-CCAvg: Avg spending on credit cards per month in $000
+- Family: Family size of the customer
 
-Education: Education level 1:Undergrad 2: Graduate 3:Advanced/Professional
+- CCAvg: Avg spending on credit cards per month in $000
 
-Mortgage: Value of mortgage if any $000
+- Education: Education level 1:Undergrad 2: Graduate 3:Advanced/Professional
 
-Securities Account: Does the customer have a securities account with the bank?
+- Mortgage: Value of mortgage if any $000
 
-CD Account:Does the customer have a certificate of deposit account with the bank?
+- Securities Account: Does the customer have a securities account with the bank?
 
-Online : Does the customer use internet banking facilities?
+- CD Account:Does the customer have a certificate of deposit account with the bank?
 
-CreditCard: Does the customer use a credit card issued by the respective bank?
+- Online : Does the customer use internet banking facilities?
 
-Personal Loan : Did the customer default on the loan or not ?
+- CreditCard: Does the customer use a credit card issued by the respective bank?
+
+- Personal Loan : Did the customer default on the loan or not ?
 
 ## gradient_boost_h20.R
 
